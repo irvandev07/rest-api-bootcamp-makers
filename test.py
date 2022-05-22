@@ -154,6 +154,9 @@ app = Flask(__name__)
 #     return circularArray(a,k,queries)
 
 
+#-------------------------------------TUGAS 2-3
+
+
 def findDigits(n):
     # Write your code here
     count = 0
@@ -182,4 +185,3 @@ def handler():
         }
         lst.append(output)
     return {'result': lst }
-
