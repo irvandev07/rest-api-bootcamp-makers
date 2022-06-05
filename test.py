@@ -128,20 +128,20 @@ app = Flask(__name__)
 
 #--------------------------------------------- TUGAS 1
 
-def circularArray(a, k, queries):
-    n=len(a)
-    ans=[]
-    for q in queries:
-        ans.append(a[(n-k+q)%n])
-    return {'result' : ans}
+# def circularArray(a, k, queries):
+#     n=len(a)
+#     ans=[]
+#     for q in queries:
+#         ans.append(a[(n-k+q)%n])
+#     return {'result' : ans}
 
-@app.route('/circular-array')
-def handler():
-    req = request.get_json()
-    k = int(request.headers.get('rotation-count'))
-    a = req['data']
-    queries = req['query']
-    return circularArray(a,k,queries)
+# @app.route('/circular-array')
+# def handler():
+#     req = request.get_json()
+#     k = int(request.headers.get('rotation-count'))
+#     a = req['data']
+#     queries = req['query']
+#     return circularArray(a,k,queries)
 
 
 #-------------------------------------TUGAS 2-3
@@ -156,13 +156,13 @@ def findDigits(n):
             count += 1
     return count
 
-@app.route('/find-digits', methods=['POST'])
-def handler():
-    lst = []
-    req = request.get_json()['check']
-    for x in range(len(req)):
-        lst.append(str(findDigits(req[x])))
-    return {'result': lst }
+# @app.route('/find-digits', methods=['POST'])
+# def handler():
+#     lst = []
+#     req = request.get_json()['check']
+#     for x in range(len(req)):
+#         lst.append(str(findDigits(req[x])))
+#     return {'result': lst }
 
 @app.route('/find-digits2', methods=['POST'])
 def handler2():
