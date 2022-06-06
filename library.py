@@ -1,12 +1,7 @@
 import base64
-import json
-import re
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 import uuid
-
-import requests
-from urllib3 import Retry
 
 app = Flask(__name__)
 db = SQLAlchemy(app)
@@ -47,6 +42,7 @@ class Book(db.Model):
     desc = db.Column(db.Text)
     public_id = db.Column(db.String, nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
     authors_book = db.relationship('Author', backref='book', secondary='author_book')
 
     def __repr__(self):
@@ -97,16 +93,25 @@ def author_user(auth):
 	lis = e.split(':')
 	username = lis[0]
 	passw = lis [1]
-	user = User.query.filter_by(username=username).first()
-	pas = User.query.filter_by(password=passw).first()
+	user = User.query.filter_by(username=username).filter_by(password=passw).first()
+	# pas = User.query.filter_by(password=passw).first()
 
-	if not user or not pas:
+	if not user:
 		return 'Please check your login details and try again.'
 	elif not user.is_admin :
 		return False
 	elif user.is_admin is True:
 		return True
-    
+
+def auth_admin(auth):
+    # decode_var = request.headers.get('Authorization')
+	c = base64.b64decode(auth[6:])
+	e = c.decode("ascii")
+	lis = e.split(':')
+	username = lis[0]
+	passw = lis [1]
+
+	return [username, passw]
 
 # #---------------------------------CATEGORY
 
@@ -219,7 +224,9 @@ def delete_category(id):
 def get_book():
 	return jsonify([
 		{ 
-			'id': book.public_id, 'title': book.title,
+			'id': book.public_id, 
+			'title': book.title,
+			'quantity' : book.quantity,
 			'category': {
 				'genre': book.category.genre,
 			},
@@ -235,7 +242,9 @@ def get_book_id(id):
 	book = Book.query.filter_by(public_id=id).first_or_404()
 	return jsonify([
 		{ 
-			'id': book.public_id, 'title': book.title,
+			'id': book.public_id, 
+			'title': book.title,
+			'quantity' : book.quantity,
 			'category': {
 				'genre': book.category.genre,
 			},
@@ -257,7 +266,6 @@ def create_author_book():
 		books.authors_book.append(author)
 		db.session.add(books)
 		db.session.commit()
-
 		return {
 			"message" : "success"
 		},201
@@ -301,6 +309,7 @@ def create_book():
 		book = Book(
 				title=data['title'], 
 				desc=data['desc'],
+				quantity=data['quantity'],
 				category_id = category.id,
 				public_id=str(uuid.uuid4())
 			)
@@ -309,6 +318,7 @@ def create_book():
 		return {
 			'id': book.public_id, 
 			'title': book.title,
+			'quantity': book.quantity,
 			'desc': book.desc,
 			'category': {
 				'genre': book.category.genre,
@@ -374,6 +384,10 @@ def get_author():
 		{
 			'id': author.public_id, 
 			'name': author.name, 
+			'book' : [
+				x.title
+				for x in author.book
+			],
 		} for author in Author.query.all()
 	]),200
 		
@@ -474,32 +488,32 @@ def get_user(id):
 		'password' : user.password, 'is admin': user.is_admin
 		},200
 
-# @app.route('/add-users/', methods=['POST'])
-# def create_user():
-# 	data = request.get_json()
-# 	if not 'name' in data or not 'username' in data:
-# 		return jsonify({
-# 			'error': 'Bad Request',
-# 			' message': 'Name or Username not given'
-# 		}), 400
-# 	if len(data['name']) < 4 or len(data['username']) < 5:
-# 		return jsonify({
-# 			'error': 'Bad Request',
-# 			'message': 'Name and Username must be contain minimum of 4 letters'
-# 		}), 400
-# 	user = User(
-# 			name=data['name'], 
-# 			username=data['username'],
-# 			password=data['password'],
-# 			is_admin=data.get('is admin', False),
-# 			public_id=str(uuid.uuid4())
-# 		)
-# 	db.session.add(user)
-# 	db.session.commit()
-# 	return {
-# 		'id': user.public_id, 'name': user.name, 'username': user.username,
-# 		'password' : user.password, 'is admin': user.is_admin
-# 	}, 201
+@app.route('/add-users/', methods=['POST'])
+def create_user():
+	data = request.get_json()
+	if not 'name' in data or not 'username' in data:
+		return jsonify({
+			'error': 'Bad Request',
+			' message': 'Name or Username not given'
+		}), 400
+	if len(data['name']) < 4 or len(data['username']) < 5:
+		return jsonify({
+			'error': 'Bad Request',
+			'message': 'Name and Username must be contain minimum of 4 letters'
+		}), 400
+	user = User(
+			name=data['name'], 
+			username=data['username'],
+			password=data['password'],
+			is_admin=data.get('is admin', False),
+			public_id=str(uuid.uuid4())
+		)
+	db.session.add(user)
+	db.session.commit()
+	return {
+		'id': user.public_id, 'name': user.name, 'username': user.username,
+		'password' : user.password, 'is admin': user.is_admin
+	}, 201
 
 @app.route('/users/<id>/', methods=['PUT'])
 def update_user(id):
@@ -529,43 +543,127 @@ def delete_user(id):
 	},200
 
 #------------------------------------ RENT
+@app.route('/rent/')
+def get_rent():
+    return jsonify([
+		{
+			'id': rent.public_id,
+			'date rent': rent.date_rent,
+			'date return': rent.date_return,
+			'user_id' : rent.user_id,
+			'book_id' : {
+				"id" : rent.book.public_id,
+				"title" : rent.book.title,
+				"desc" : rent.book.desc
+			},
+			'admin_id': rent.admin_id
+		} for rent in Rent.query.all()
+	]),200
+
+@app.route('/rent/<id>')
+def get_rent_id(id):
+	print(id)
+	rent = Rent.query.filter_by(public_id=id).first_or_404()
+	return jsonify([
+		{
+			'id': rent.public_id,
+			'date rent': rent.date_rent,
+			'date return': rent.date_return,
+			'user_id' : rent.user_id,
+			'book_id' : {
+				"id" : rent.book.public_id,
+				"title" : rent.book.title,
+				"desc" : rent.book.desc
+			},
+			'admin_id': rent.admin_id
+		}
+	]),200
 
 @app.route('/rent/', methods=['POST'])
 def create_rent():
-	data = request.get_json()
-	book = Book.query.filter_by(title=data['title']).first()
-	if not 'title':
-		return jsonify({
-			'error': 'Bad Request',
-			' message': 'Title not given'
-		}), 400
-	user = User.query.filter_by(username=data['username']).first()
-	if not 'username':
-		return jsonify({
-			'error': 'Bad Request',
-			' message': 'Username not given'
-		}), 400
-	rent = Rent(
-			date_rent=data['date_rent'], 
-			date_return=data['date_return'],
-			book_id=book.id,
-			user_id=user.id,
-			admin_id=user.id,
-			public_id=str(uuid.uuid4())
-		)
-	db.session.add(rent)
-	db.session.commit()
-	return {
-		# "message" :  "success"
-		'id': rent.public_id,
-		'date rent': rent.date_rent, 
-		'date return': rent.date_return,
-		'user_id' : {
-			rent.rent.user_id
-		},
-		'book_id' : {
-			rent.book.title
-		},
-		'is admin': rent.rent.is_admin
-		
-	}, 201
+	decode_var = request.headers.get('Authorization')
+	allow = author_user(decode_var)
+	if allow == True:
+		data = request.get_json()
+		user = User.query.filter_by(username=data['username']).first()
+		if not 'username':
+			return jsonify({
+				'error': 'Bad Request',
+				' message': 'Username not given'
+			}), 400
+		for x in data['title']:
+			book = Book.query.filter_by(title=x).first()
+			if book.quantity == 0:
+				return jsonify ({
+                    'message': 'Book not available'
+                }), 400
+
+		for x in data['title']:
+			book = Book.query.filter_by(title=x).first()
+			if not book:
+				return jsonify({
+					'error': 'Bad Request',
+					' message': 'Title not given'
+				}), 400
+
+			admin = auth_admin(decode_var)[0]
+			admin_ = User.query.filter_by(username=admin).first()
+			rent = Rent(
+					date_rent=data['date_rent'], 
+					date_return=data['date_return'],
+					book_id=book.id,
+					user_id=user.id,
+					admin_id=admin_.id,
+					public_id=str(uuid.uuid4())
+				)
+			book.quantity -= 1
+			db.session.add(rent)
+		db.session.commit()
+		return {
+			"message" :  "success"
+			# 'id': rent.public_id,
+			# 'date rent': rent.date_rent,
+			# 'date return': rent.date_return,
+			# 'user_id' :rent.rent.user_id,
+			# 'book_id' : rent.book.title,
+			# 'admin_id': rent.is_admin
+		}, 201
+	else:
+		return {
+            'message': 'Access denied'
+        }, 401
+
+@app.route('/rent/<id>',  methods=['PUT'])
+def update_rent(id):
+    decode_var = request.headers.get('Authorization')
+    allow = author_user(decode_var)
+    if allow == True :
+        data = request.get_json()
+        rent = Rent.query.filter_by(public_id=id).first_or_404()
+        book = Book.query.filter_by(id=rent.book_id).first_or_404()
+        rent.date_return = data['date_return']
+        book.quantity += 1
+        db.session.commit()
+        return {
+            'message': 'success'
+        }
+    else:
+        return {
+            'message': 'Access denied'
+        }, 401
+
+@app.route('/rent/<id>/', methods=['DELETE'] )
+def delete_rent(id):
+	decode_var = request.headers.get('Authorization')
+	allow = author_user(decode_var)
+	if allow == True:
+		rent = Rent.query.filter_by(public_id=id).first_or_404()
+		db.session.delete(rent)
+		db.session.commit()
+		return {
+			'success': 'Data deleted successfully'
+		}
+	elif allow == False:
+		return "Youre not admin! please check and try again."
+	elif allow == 'Please check your login details and try again.':
+		return allow
