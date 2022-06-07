@@ -29,8 +29,14 @@ class Todo(db.Model):
 	def __repr__(self):
 		return f'Todo: <{self.name}>'
 
-db.create_all()
-db.session.commit()
+# db.create_all()
+# db.session.commit()
+
+@app.route('/')
+def home():
+	return {
+		'message': 'Welcome to building RESTful APIs with Flask and SQLAlchemy'
+	}
 
 @app.route('/add-user', methods=['POST'])
 def adduser():
@@ -48,11 +54,6 @@ def adduser():
 	return "Success"
 	
     
-@app.route('/')
-def home():
-	return {
-		'message': 'Welcome to building RESTful APIs with Flask and SQLAlchemy'
-	}
 
 @app.route('/users/')
 def get_users():
