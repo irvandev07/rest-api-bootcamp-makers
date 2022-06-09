@@ -380,16 +380,22 @@ def delete_todo(id):
 
 @app.route('/author/')
 def get_author():
-	return jsonify([
-		{
-			'id': author.public_id, 
-			'name': author.name, 
-			'book' : [
-				x.title
-				for x in author.book
-			],
-		} for author in Author.query.all()
-	]),200
+	decode_var = request.headers.get('Authorization')
+	allow = author_user(decode_var)
+	if allow == True or allow == False:
+		return jsonify([
+			{
+				'id': author.public_id, 
+				'name': author.name, 
+				'book' : [
+					x.title
+					for x in author.book
+				],
+			} for author in Author.query.all()
+		]),200
+	return {
+		'message' : 'invalid username or password'
+	}
 		
 @app.route('/author/<id>/')
 def get_author_id(id):
