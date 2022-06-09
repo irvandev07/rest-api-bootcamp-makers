@@ -176,13 +176,21 @@ def update_user(id):
 				'error': 'Bad Request',
 				'message': 'Name field needs to be present'
 			}, 400
-		user = User.query.filter_by(public_id=id).first_or_404()
+		user = User.query.filter_by(public_id=id).filter_by(username=allow).first_or_404()
+		if not user:
+			return {'message' : 'Please check login detail!'}
 		user.name=data['name']
+		user.username=data['username']
+		user.password=data['password']
 		if 'name' in data:
 			user.name=data['name']
+		if 'username' in data:
+			user.username=data['username']
+		if 'password' in data:
+			user.password=data['password']
 		db.session.commit()
 		return jsonify({
-			'id': user.public_id, 'name': user.name,
+			'id': user.public_id, 'name': user.name, 'username': user.username, 'password': user.password,
 		}),200
 
 #--------------------------------------- INSTRUCTORS
